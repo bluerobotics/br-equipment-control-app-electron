@@ -11,7 +11,7 @@ import {
 } from 'lucide-react'
 import { useState, useMemo } from 'react'
 import { useAppStore } from '../../stores/appStore'
-import { triggerDiscovery, sendCommand, listSerialPorts, connectSerial, disconnectSerial, fetchDevices } from '../../services/api'
+import { triggerDiscovery, sendCommand, listSerialPorts, connectSerial, disconnectSerial, fetchDevices, useNetworkConnection } from '../../services/api'
 
 export function DevicesView() {
   const { 
@@ -139,6 +139,23 @@ export function DevicesView() {
       } catch (error) {
         addTerminalMessage({ type: 'error', message: 'Failed to disconnect USB' })
       }
+    }
+    setShowConnectionDialog(null)
+  }
+
+  const handleUseNetwork = async (deviceName: string) => {
+    addTerminalMessage({ type: 'info', message: `Switching ${deviceName} to network mode...` })
+    try {
+      const result = await useNetworkConnection(deviceName)
+      if (result.success) {
+        addTerminalMessage({ type: 'success', message: `${deviceName} switched to network mode` })
+        // Refresh device state immediately
+        await refreshDevices()
+      } else {
+        addTerminalMessage({ type: 'error', message: 'Failed to switch to network mode' })
+      }
+    } catch (error) {
+      addTerminalMessage({ type: 'error', message: 'Error switching to network mode' })
     }
     setShowConnectionDialog(null)
   }
@@ -452,10 +469,14 @@ export function DevicesView() {
                   <Wifi size={14} />
                   Network Connection
                 </div>
-                <div className="text-xs text-vsc-fg-muted p-2 bg-vsc-input/30 rounded">
+                <div className="text-xs text-vsc-fg-muted p-2 bg-vsc-input/30 rounded mb-2">
                   {devices[showConnectionDialog]?.connectionMethod === 'network' && devices[showConnectionDialog]?.connected ? (
                     <span className="text-green-400">
                       Connected to {devices[showConnectionDialog]?.ip}:{devices[showConnectionDialog]?.port}
+                    </span>
+                  ) : devices[showConnectionDialog]?.connectionMethod === 'usb' ? (
+                    <span className="text-yellow-500">
+                      Currently using USB mode. Click below to switch to network.
                     </span>
                   ) : (
                     <>
@@ -465,6 +486,14 @@ export function DevicesView() {
                     </>
                   )}
                 </div>
+                {devices[showConnectionDialog]?.connectionMethod === 'usb' && (
+                  <button
+                    onClick={() => handleUseNetwork(showConnectionDialog)}
+                    className="w-full px-3 py-1.5 text-xs bg-green-600 hover:bg-green-700 rounded"
+                  >
+                    Switch to Network
+                  </button>
+                )}
               </div>
             </div>
 

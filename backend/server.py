@@ -976,17 +976,26 @@ def serial_listener_thread(port_name, device_key):
 def connect_serial_device(port_name, device_key):
     """Connect to a device on a serial port."""
     if not SERIAL_AVAILABLE:
+        log_message(f"[ERROR] pyserial not available - cannot connect USB")
         return False
     
     with serial_lock:
         if port_name in serial_connections:
+            log_message(f"[INFO] {device_key}: Already connected to {port_name}")
             return True  # Already connected
         
-        # Update device state
+        # Update device state BEFORE starting thread
         with state_lock:
             if device_key in devices_state:
                 devices_state[device_key]['serial_port'] = port_name
                 devices_state[device_key]['connection_method'] = 'usb'
+                devices_state[device_key]['connected'] = False  # Will be set True when data received
+                devices_state[device_key]['ip'] = None  # Clear network IP
+        
+        log_message(f"[SYSTEM] {device_key}: Switching to USB mode on {port_name}")
+        
+        # Emit update immediately so frontend sees the change
+        emit_device_update(device_key)
         
         # Start listener thread
         thread = threading.Thread(
@@ -1019,10 +1028,38 @@ def disconnect_serial_device(port_name):
                 with state_lock:
                     if device_key in devices_state:
                         devices_state[device_key]['connected'] = False
+                log_message(f"[SYSTEM] {device_key}: USB disconnected from {port_name}")
                 emit_device_update(device_key)
             
             return True
     return False
+
+def switch_to_network(device_key):
+    """Switch a device from USB to network connection mode."""
+    with state_lock:
+        if device_key not in devices_state:
+            return False
+        
+        device = devices_state[device_key]
+        old_method = device.get('connection_method', 'network')
+        serial_port = device.get('serial_port')
+        
+        # Disconnect USB if connected
+        if serial_port and serial_port in serial_connections:
+            disconnect_serial_device(serial_port)
+        
+        # Reset to network mode
+        device['connection_method'] = 'network'
+        device['serial_port'] = None
+        device['connected'] = False  # Will reconnect via network discovery
+        
+        # Save config
+        save_connection_config(device_key, 'network', None)
+        
+        log_message(f"[SYSTEM] {device_key}: Switched from {old_method} to network mode")
+    
+    emit_device_update(device_key)
+    return True
 
 # ============================================================================
 # REST API Endpoints
@@ -1145,6 +1182,12 @@ def disconnect_serial():
         return jsonify({'error': 'Port required'}), 400
     
     success = disconnect_serial_device(port_name)
+    return jsonify({'success': success})
+
+@app.route('/api/devices/<device_name>/use_network', methods=['POST'])
+def use_network(device_name):
+    """Switch a device to network connection mode."""
+    success = switch_to_network(device_name)
     return jsonify({'success': success})
 
 @app.route('/api/serial/detect', methods=['POST'])

@@ -187,6 +187,13 @@ export async function disconnectSerial(port: string): Promise<{ success: boolean
   return response.json()
 }
 
+export async function useNetworkConnection(device: string): Promise<{ success: boolean }> {
+  const response = await fetch(`${API_BASE}/devices/${device}/use_network`, {
+    method: 'POST'
+  })
+  return response.json()
+}
+
 export async function detectSerialDevice(port: string): Promise<{ device: string | null }> {
   const response = await fetch(`${API_BASE}/serial/detect`, {
     method: 'POST',
