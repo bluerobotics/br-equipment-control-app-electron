@@ -107,8 +107,21 @@ export function EditorArea() {
 
   // Reset all connected devices
   const handleReset = useCallback(async () => {
+    // Stop any running script
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort()
+    }
+    
+    // Clear state
+    setIsRunning(false)
+    setIsPaused(false)
+    setScriptRunning(false)
+    setCurrentLine(null)
+    clearHighlight()
+    pauseResolverRef.current = null
+    
     if (connectedDevices.length === 0) {
-      addTerminalMessage({ type: 'error', message: 'No device connected' })
+      addTerminalMessage({ type: 'info', message: '🔄 Reset - cleared script state' })
       return
     }
     
@@ -122,7 +135,7 @@ export function EditorArea() {
         addTerminalMessage({ type: 'error', message: `Reset failed: ${err}`, device: deviceName })
       }
     }
-  }, [connectedDevices, addTerminalMessage])
+  }, [connectedDevices, addTerminalMessage, clearHighlight, setScriptRunning, setCurrentLine])
 
   // Continue execution after single block pause
   const continueExecution = useCallback(() => {
@@ -177,14 +190,14 @@ export function EditorArea() {
     // Clear previous decorations
     decorationsRef.current = editor.deltaDecorations(decorationsRef.current, [])
     
-    // Add new decoration
+    // Add new decoration - subtle left border highlight
     decorationsRef.current = editor.deltaDecorations([], [
       {
         range: new monaco.Range(lineNumber, 1, lineNumber, 1),
         options: {
           isWholeLine: true,
-          className: 'bg-yellow-500/20',
-          glyphMarginClassName: 'bg-yellow-500 rounded-full',
+          linesDecorationsClassName: 'current-line-decoration',
+          className: 'current-line-highlight',
         }
       }
     ])
