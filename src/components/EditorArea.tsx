@@ -1,7 +1,7 @@
 import { useRef, useState, useCallback } from 'react'
 import Editor, { OnMount } from '@monaco-editor/react'
 import { useAppStore } from '../stores/appStore'
-import { FileCode, X, Circle, Play, Square, Save, FolderOpen, FileText } from 'lucide-react'
+import { FileCode, X, Circle, Play, Square, Save, FolderOpen, FileText, RotateCcw, StepForward } from 'lucide-react'
 import type { editor } from 'monaco-editor'
 import { sendCommand } from '../services/api'
 
@@ -94,13 +94,44 @@ export function EditorArea() {
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null)
   const monacoRef = useRef<typeof import('monaco-editor') | null>(null)
   const [isRunning, setIsRunning] = useState(false)
+  const [singleBlockMode, setSingleBlockMode] = useState(false)
+  const [isPaused, setIsPaused] = useState(false)
   const abortControllerRef = useRef<AbortController | null>(null)
+  const pauseResolverRef = useRef<(() => void) | null>(null)
   const decorationsRef = useRef<string[]>([])
 
   // Get connected devices
   const connectedDevices = Object.entries(devices)
     .filter(([_, d]) => d.connected)
     .map(([name]) => name)
+
+  // Reset all connected devices
+  const handleReset = useCallback(async () => {
+    if (connectedDevices.length === 0) {
+      addTerminalMessage({ type: 'error', message: 'No device connected' })
+      return
+    }
+    
+    addTerminalMessage({ type: 'info', message: '🔄 Sending reset to all devices...' })
+    
+    for (const deviceName of connectedDevices) {
+      try {
+        await sendCommand(deviceName, 'reset')
+        addTerminalMessage({ type: 'sent', message: 'reset', device: deviceName })
+      } catch (err) {
+        addTerminalMessage({ type: 'error', message: `Reset failed: ${err}`, device: deviceName })
+      }
+    }
+  }, [connectedDevices, addTerminalMessage])
+
+  // Continue execution after single block pause
+  const continueExecution = useCallback(() => {
+    if (pauseResolverRef.current) {
+      pauseResolverRef.current()
+      pauseResolverRef.current = null
+      setIsPaused(false)
+    }
+  }, [])
 
   const handleEditorMount: OnMount = (editor, monaco) => {
     editorRef.current = editor
@@ -170,7 +201,14 @@ export function EditorArea() {
 
   // Parse and run script
   const runScript = useCallback(async () => {
-    if (isRunning) return
+    if (isRunning && !isPaused) return
+    
+    // If paused in single block mode, continue
+    if (isPaused) {
+      continueExecution()
+      return
+    }
+    
     if (connectedDevices.length === 0) {
       addTerminalMessage({ type: 'error', message: 'No device connected' })
       return
@@ -181,7 +219,8 @@ export function EditorArea() {
     abortControllerRef.current = new AbortController()
     
     const lines = script.content.split('\n')
-    addTerminalMessage({ type: 'info', message: '▶ Script started' })
+    const mode = singleBlockMode ? 'SINGLE BLOCK' : 'CONTINUOUS'
+    addTerminalMessage({ type: 'info', message: `▶ Script started (${mode} mode)` })
     
     try {
       for (let i = 0; i < lines.length; i++) {
@@ -208,6 +247,8 @@ export function EditorArea() {
         // Or: wait 1.5
         // Or: wait_for device.variable > 10
         
+        let executedCommand = false
+        
         if (line.startsWith('wait ')) {
           // Wait command: wait <seconds>
           const seconds = parseFloat(line.substring(5))
@@ -215,6 +256,7 @@ export function EditorArea() {
             addTerminalMessage({ type: 'info', message: `⏳ Waiting ${seconds}s...`, device: 'script' })
             await new Promise(resolve => setTimeout(resolve, seconds * 1000))
           }
+          executedCommand = true
         } else if (line.includes('.')) {
           // Device command: device.command params
           const dotIndex = line.indexOf('.')
@@ -250,6 +292,7 @@ export function EditorArea() {
               })
               // Don't break on error, continue script
             }
+            executedCommand = true
             
             // Small delay between commands
             await new Promise(resolve => setTimeout(resolve, 100))
@@ -267,6 +310,23 @@ export function EditorArea() {
             device: 'script'
           })
         }
+        
+        // In single block mode, pause after each command
+        if (singleBlockMode && executedCommand && i < lines.length - 1) {
+          setIsPaused(true)
+          addTerminalMessage({ type: 'info', message: '⏸ Paused - Click Run to continue', device: 'script' })
+          
+          // Wait for user to click Run again
+          await new Promise<void>((resolve) => {
+            pauseResolverRef.current = resolve
+          })
+          
+          // Check if stopped while paused
+          if (abortControllerRef.current?.signal.aborted) {
+            addTerminalMessage({ type: 'warning', message: '⏹ Script stopped by user' })
+            break
+          }
+        }
       }
       
       if (!abortControllerRef.current?.signal.aborted) {
@@ -276,12 +336,14 @@ export function EditorArea() {
       addTerminalMessage({ type: 'error', message: `Script error: ${err}` })
     } finally {
       setIsRunning(false)
+      setIsPaused(false)
       setScriptRunning(false)
       setCurrentLine(null)
       clearHighlight()
       abortControllerRef.current = null
+      pauseResolverRef.current = null
     }
-  }, [script.content, connectedDevices, isRunning, highlightLine, clearHighlight, addTerminalMessage, setScriptRunning, setCurrentLine])
+  }, [script.content, connectedDevices, isRunning, isPaused, singleBlockMode, highlightLine, clearHighlight, addTerminalMessage, setScriptRunning, setCurrentLine, continueExecution])
 
   // Stop script execution
   const stopScript = useCallback(() => {
@@ -300,15 +362,15 @@ export function EditorArea() {
       {/* Toolbar */}
       <div className="h-10 bg-vsc-bg-dark flex items-center px-2 border-b border-vsc-border gap-1">
         {/* Run/Stop buttons */}
-        {!isRunning ? (
+        {!isRunning || isPaused ? (
           <button
             onClick={runScript}
             disabled={connectedDevices.length === 0}
             className="flex items-center gap-1.5 px-3 py-1 rounded bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-medium"
-            title={connectedDevices.length === 0 ? "No device connected" : "Run script (F5)"}
+            title={connectedDevices.length === 0 ? "No device connected" : isPaused ? "Continue (F5)" : "Run script (F5)"}
           >
             <Play size={14} />
-            Run
+            {isPaused ? 'Continue' : 'Run'}
           </button>
         ) : (
           <button
@@ -320,6 +382,46 @@ export function EditorArea() {
             Stop
           </button>
         )}
+        
+        {isRunning && !isPaused && (
+          <button
+            onClick={stopScript}
+            className="flex items-center gap-1.5 px-2 py-1 rounded bg-red-600/20 hover:bg-red-600/40 text-red-400 text-xs font-medium"
+            title="Stop script"
+          >
+            <Square size={14} />
+          </button>
+        )}
+        
+        <div className="w-px h-5 bg-vsc-border mx-1" />
+        
+        {/* Single Block Mode Toggle */}
+        <button
+          onClick={() => setSingleBlockMode(!singleBlockMode)}
+          disabled={isRunning}
+          className={`flex items-center gap-1.5 px-3 py-1 rounded text-xs font-medium transition-colors ${
+            singleBlockMode 
+              ? 'bg-yellow-600 hover:bg-yellow-700 text-white' 
+              : 'bg-vsc-bg hover:bg-vsc-highlight text-vsc-fg-dim hover:text-vsc-fg border border-vsc-border'
+          } disabled:opacity-50`}
+          title="Single Block Mode - pause after each command"
+        >
+          <StepForward size={14} />
+          Single Block
+        </button>
+        
+        <div className="w-px h-5 bg-vsc-border mx-1" />
+        
+        {/* Reset Button */}
+        <button
+          onClick={handleReset}
+          disabled={connectedDevices.length === 0}
+          className="flex items-center gap-1.5 px-3 py-1 rounded bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-medium"
+          title="Reset all connected devices"
+        >
+          <RotateCcw size={14} />
+          Reset
+        </button>
         
         <div className="w-px h-5 bg-vsc-border mx-1" />
         
@@ -346,9 +448,16 @@ export function EditorArea() {
         <div className="flex-1" />
         
         {/* Status */}
-        {isRunning && (
+        {isRunning && isPaused && (
           <span className="text-xs text-yellow-400 flex items-center gap-1.5">
-            <span className="w-2 h-2 bg-yellow-400 rounded-full animate-pulse" />
+            <span className="w-2 h-2 bg-yellow-400 rounded-full" />
+            Paused at line {script.currentLine || '...'}
+          </span>
+        )}
+        
+        {isRunning && !isPaused && (
+          <span className="text-xs text-green-400 flex items-center gap-1.5">
+            <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
             Running line {script.currentLine || '...'}
           </span>
         )}
