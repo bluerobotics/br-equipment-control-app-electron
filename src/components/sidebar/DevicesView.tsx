@@ -94,12 +94,25 @@ export function DevicesView() {
     try {
       const ports = await listSerialPorts()
       setSerialPorts(ports)
-      // Pre-select current port if USB is configured
+      
+      // Pre-select port in priority order:
+      // 1. Current configured port if USB is already configured
+      // 2. Any port with "Teknic" or "ClearCore" in description
+      // 3. First available port
       const device = devices[deviceName]
       if (device?.serialPort) {
         setSelectedPort(device.serialPort)
-      } else if (ports.length > 0) {
-        setSelectedPort(ports[0].port)
+      } else {
+        // Look for Teknic/ClearCore ports first
+        const clearCorePort = ports.find(p => 
+          p.description.toLowerCase().includes('teknic') || 
+          p.description.toLowerCase().includes('clearcore')
+        )
+        if (clearCorePort) {
+          setSelectedPort(clearCorePort.port)
+        } else if (ports.length > 0) {
+          setSelectedPort(ports[0].port)
+        }
       }
     } catch (error) {
       addTerminalMessage({ type: 'error', message: 'Failed to list serial ports' })

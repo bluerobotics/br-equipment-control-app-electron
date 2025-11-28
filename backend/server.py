@@ -808,11 +808,15 @@ def handle_serial_message(device_key, message):
             was_connected = device.get('connected', False)
             device['connected'] = True
             device['last_rx'] = time.time()
+            device['connection_method'] = 'usb'  # Ensure USB mode is set
             
             if not was_connected:
                 serial_port = device.get('serial_port', 'USB')
                 log_message(f"[SYSTEM] {device_key}: Connected via USB on {serial_port}")
-                emit_device_update(device_key)
+    
+    # Emit update outside the lock to avoid potential deadlock
+    if device_key in devices_state:
+        emit_device_update(device_key)
     
     # Discovery response
     if msg.startswith("DISCOVERY_RESPONSE:"):
