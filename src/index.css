@@ -1,0 +1,258 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* VS Code-like base styles */
+:root {
+  /* Editor colors */
+  --vsc-bg: #1e1e1e;
+  --vsc-bg-dark: #181818;
+  --vsc-bg-darker: #141414;
+  --vsc-sidebar: #252526;
+  --vsc-sidebar-dark: #1f1f1f;
+  --vsc-activitybar: #181818;
+  --vsc-panel: #181818;
+  --vsc-input: #3c3c3c;
+  --vsc-border: #3c3c3c;
+  --vsc-border-light: #464646;
+  
+  /* Text colors */
+  --vsc-fg: #cccccc;
+  --vsc-fg-dim: #858585;
+  --vsc-fg-muted: #6e6e6e;
+  
+  /* Accent colors */
+  --vsc-accent: #0078d4;
+  --vsc-accent-hover: #1f8ad2;
+  --vsc-selection: #264f78;
+  --vsc-highlight: rgba(173, 214, 255, 0.15);
+  
+  /* Semantic colors */
+  --vsc-success: #4ec9b0;
+  --vsc-warning: #dcdcaa;
+  --vsc-error: #f14c4c;
+  --vsc-info: #75beff;
+  
+  /* Syntax highlighting */
+  --vsc-keyword: #569cd6;
+  --vsc-string: #ce9178;
+  --vsc-number: #b5cea8;
+  --vsc-comment: #6a9955;
+  --vsc-function: #dcdcaa;
+  --vsc-variable: #9cdcfe;
+  --vsc-type: #4ec9b0;
+  
+  /* Sizing */
+  --titlebar-height: 32px;
+  --activitybar-width: 48px;
+  --sidebar-width: 280px;
+  --panel-height: 200px;
+  --statusbar-height: 22px;
+}
+
+/* Global resets */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+  font-size: 13px;
+  color: var(--vsc-fg);
+  background-color: var(--vsc-bg);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Custom scrollbar (VS Code style) */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(121, 121, 121, 0.4);
+  border-radius: 5px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(121, 121, 121, 0.7);
+}
+
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* Selection */
+::selection {
+  background-color: var(--vsc-selection);
+}
+
+/* Focus styles */
+:focus {
+  outline: none;
+}
+
+:focus-visible {
+  outline: 1px solid var(--vsc-accent);
+  outline-offset: -1px;
+}
+
+/* Monospace text */
+.font-mono, code, pre {
+  font-family: 'Cascadia Code', 'Consolas', 'Monaco', 'Courier New', monospace;
+}
+
+/* Button base */
+button {
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+/* Input base */
+input, textarea, select {
+  font-family: inherit;
+  font-size: inherit;
+  color: var(--vsc-fg);
+  background: var(--vsc-input);
+  border: 1px solid var(--vsc-border);
+  border-radius: 2px;
+  padding: 4px 8px;
+}
+
+input:focus, textarea:focus, select:focus {
+  border-color: var(--vsc-accent);
+  outline: none;
+}
+
+/* Custom title bar drag region */
+.titlebar-drag-region {
+  -webkit-app-region: drag;
+}
+
+.titlebar-no-drag {
+  -webkit-app-region: no-drag;
+}
+
+/* Resizable panel handles */
+.resize-handle {
+  position: relative;
+  z-index: 10;
+}
+
+.resize-handle::after {
+  content: '';
+  position: absolute;
+  background: transparent;
+  transition: background-color 0.1s;
+}
+
+.resize-handle:hover::after {
+  background: var(--vsc-accent);
+}
+
+.resize-handle-horizontal {
+  width: 4px;
+  cursor: col-resize;
+}
+
+.resize-handle-horizontal::after {
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 4px;
+}
+
+.resize-handle-vertical {
+  height: 4px;
+  cursor: row-resize;
+}
+
+.resize-handle-vertical::after {
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 4px;
+}
+
+/* VS Code-like tree item */
+.tree-item {
+  display: flex;
+  align-items: center;
+  padding: 2px 0;
+  padding-left: calc(var(--indent-level, 0) * 16px + 8px);
+  cursor: pointer;
+  user-select: none;
+}
+
+.tree-item:hover {
+  background: var(--vsc-highlight);
+}
+
+.tree-item.selected {
+  background: var(--vsc-selection);
+}
+
+/* Activity bar icon button */
+.activity-bar-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  color: var(--vsc-fg-dim);
+  border-left: 2px solid transparent;
+  transition: color 0.1s;
+}
+
+.activity-bar-icon:hover {
+  color: var(--vsc-fg);
+}
+
+.activity-bar-icon.active {
+  color: var(--vsc-fg);
+  border-left-color: var(--vsc-fg);
+}
+
+/* Status bar item */
+.statusbar-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 8px;
+  height: 100%;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.statusbar-item:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* Terminal cursor */
+.xterm-cursor-layer {
+  z-index: 4;
+}
+
+/* Monaco editor overrides */
+.monaco-editor {
+  --vscode-editor-background: var(--vsc-bg) !important;
+}
+
