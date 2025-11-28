@@ -1,5 +1,5 @@
 import { app, BrowserWindow, ipcMain, Menu, shell } from 'electron'
-import { spawn, ChildProcess } from 'child_process'
+import { spawn, spawnSync, ChildProcess } from 'child_process'
 import path from 'path'
 import os from 'os'
 import { fileURLToPath } from 'url'
@@ -259,14 +259,27 @@ function startPythonBackend() {
 
 // Kill Python backend
 function killPythonBackend() {
-  if (pythonProcess) {
-    console.log('🔪 Terminating Python process...')
+  console.log('🔪 Terminating Python backend...')
+  
+  if (pythonProcess && pythonProcess.pid) {
+    const pid = pythonProcess.pid
+    
     if (os.platform() === 'win32') {
-      spawn('taskkill', ['/pid', pythonProcess.pid!.toString(), '/f', '/t'])
+      // Use spawnSync to wait for kill to complete
+      // /T kills child processes, /F forces termination
+      spawnSync('taskkill', ['/pid', pid.toString(), '/f', '/t'], { stdio: 'ignore' })
     } else {
       pythonProcess.kill('SIGTERM')
     }
     pythonProcess = null
+  }
+  
+  // Also kill any orphaned Python processes running our backend (backup)
+  if (os.platform() === 'win32') {
+    // Kill any python processes that might be running server.py
+    spawnSync('taskkill', ['/f', '/im', 'python.exe', '/fi', 'WINDOWTITLE eq *server.py*'], { stdio: 'ignore' })
+    spawnSync('taskkill', ['/f', '/im', 'python3.exe'], { stdio: 'ignore' })
+    spawnSync('taskkill', ['/f', '/im', 'python3.13.exe'], { stdio: 'ignore' })
   }
 }
 
@@ -308,6 +321,7 @@ app.whenReady().then(() => {
 })
 
 app.on('window-all-closed', () => {
+  killPythonBackend()
   if (process.platform !== 'darwin') {
     app.quit()
   }
@@ -317,9 +331,21 @@ app.on('will-quit', () => {
   killPythonBackend()
 })
 
+app.on('before-quit', () => {
+  killPythonBackend()
+})
+
 // Handle Ctrl+C in terminal
 process.on('SIGINT', () => {
   console.log('SIGINT received. Shutting down...')
+  killPythonBackend()
+  app.quit()
+})
+
+// Handle uncaught exceptions
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught exception:', err)
+  killPythonBackend()
   app.quit()
 })
 
