@@ -84,8 +84,12 @@ export function CommandsView() {
       : ''
     const commandStr = `${device}.${command}${paramStr}`
     
-    // Insert at cursor or append
-    const newContent = script.content + (script.content.endsWith('\n') ? '' : '\n') + commandStr + '\n'
+    // Append to script content, adding newline only if needed
+    let newContent = script.content
+    if (newContent.length > 0 && !newContent.endsWith('\n')) {
+      newContent += '\n'
+    }
+    newContent += commandStr
     setScriptContent(newContent)
     
     addTerminalMessage({ type: 'info', message: `Inserted: ${commandStr}` })

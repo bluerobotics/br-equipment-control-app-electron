@@ -233,10 +233,21 @@ export function EditorArea() {
     
     const lines = script.content.split('\n')
     const mode = singleBlockMode ? 'SINGLE BLOCK' : 'CONTINUOUS'
-    addTerminalMessage({ type: 'info', message: `▶ Script started (${mode} mode)` })
+    
+    // In single block mode, start from cursor position
+    let startLine = 0
+    if (singleBlockMode && editorRef.current) {
+      const cursorPosition = editorRef.current.getPosition()
+      if (cursorPosition) {
+        startLine = cursorPosition.lineNumber - 1 // Convert to 0-based index
+        addTerminalMessage({ type: 'info', message: `▶ Single block from line ${startLine + 1}` })
+      }
+    } else {
+      addTerminalMessage({ type: 'info', message: `▶ Script started (${mode} mode)` })
+    }
     
     try {
-      for (let i = 0; i < lines.length; i++) {
+      for (let i = startLine; i < lines.length; i++) {
         // Check if aborted
         if (abortControllerRef.current?.signal.aborted) {
           addTerminalMessage({ type: 'warning', message: '⏹ Script stopped by user' })
