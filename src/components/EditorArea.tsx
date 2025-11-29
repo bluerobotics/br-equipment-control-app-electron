@@ -105,47 +105,6 @@ export function EditorArea() {
     .filter(([_, d]) => d.connected)
     .map(([name]) => name)
 
-  // Reset all connected devices
-  const handleReset = useCallback(async () => {
-    // Stop any running script
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort()
-    }
-    
-    // Clear state
-    setIsRunning(false)
-    setIsPaused(false)
-    setScriptRunning(false)
-    setCurrentLine(null)
-    clearHighlight()
-    pauseResolverRef.current = null
-    
-    if (connectedDevices.length === 0) {
-      addTerminalMessage({ type: 'info', message: '🔄 Reset - cleared script state' })
-      return
-    }
-    
-    addTerminalMessage({ type: 'info', message: '🔄 Sending reset to all devices...' })
-    
-    for (const deviceName of connectedDevices) {
-      try {
-        await sendCommand(deviceName, 'reset')
-        addTerminalMessage({ type: 'sent', message: 'reset', device: deviceName })
-      } catch (err) {
-        addTerminalMessage({ type: 'error', message: `Reset failed: ${err}`, device: deviceName })
-      }
-    }
-  }, [connectedDevices, addTerminalMessage, clearHighlight, setScriptRunning, setCurrentLine])
-
-  // Continue execution after single block pause
-  const continueExecution = useCallback(() => {
-    if (pauseResolverRef.current) {
-      pauseResolverRef.current()
-      pauseResolverRef.current = null
-      setIsPaused(false)
-    }
-  }, [])
-
   const handleEditorMount: OnMount = (editor, monaco) => {
     editorRef.current = editor
     monacoRef.current = monaco
@@ -210,6 +169,47 @@ export function EditorArea() {
   const clearHighlight = useCallback(() => {
     if (!editorRef.current) return
     decorationsRef.current = editorRef.current.deltaDecorations(decorationsRef.current, [])
+  }, [])
+
+  // Reset all connected devices
+  const handleReset = useCallback(async () => {
+    // Stop any running script
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort()
+    }
+    
+    // Clear state
+    setIsRunning(false)
+    setIsPaused(false)
+    setScriptRunning(false)
+    setCurrentLine(null)
+    clearHighlight()
+    pauseResolverRef.current = null
+    
+    if (connectedDevices.length === 0) {
+      addTerminalMessage({ type: 'info', message: '🔄 Reset - cleared script state' })
+      return
+    }
+    
+    addTerminalMessage({ type: 'info', message: '🔄 Sending reset to all devices...' })
+    
+    for (const deviceName of connectedDevices) {
+      try {
+        await sendCommand(deviceName, 'reset')
+        addTerminalMessage({ type: 'sent', message: 'reset', device: deviceName })
+      } catch (err) {
+        addTerminalMessage({ type: 'error', message: `Reset failed: ${err}`, device: deviceName })
+      }
+    }
+  }, [connectedDevices, addTerminalMessage, clearHighlight, setScriptRunning, setCurrentLine])
+
+  // Continue execution after single block pause
+  const continueExecution = useCallback(() => {
+    if (pauseResolverRef.current) {
+      pauseResolverRef.current()
+      pauseResolverRef.current = null
+      setIsPaused(false)
+    }
   }, [])
 
   // Parse and run script
